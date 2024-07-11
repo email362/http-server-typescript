@@ -18,11 +18,12 @@ const server = net.createServer((socket) => {
       socket.write(OK);
     } else if (/\/echo\/?/.test(path)) {
       const echoStr = path.split("/").pop() as string;
+      const status = Buffer.from(`HTTP/1.1 200 OK\r\n`);
       const response = Buffer.from(echoStr);
       const headers = Buffer.from(
-        `Content-Type: text/plain\r\nContent-Length: ${response.length}\r\n`
+        `Content-Type: text/plain\r\nContent-Length: ${response.length}\r\n\r\n`
       );
-      socket.write(Buffer.concat([OK, headers, response]));
+      socket.write(Buffer.concat([status, headers, response]));
     } else {
       socket.write(NOT_FOUND);
     }
