@@ -14,7 +14,7 @@ const server = net.createServer((socket) => {
   });
   socket.on("data", (data) => {
     console.log("Data received from client: ", data.toString());
-    socket.write(Buffer.from(`HTTP/1.1 200 OK \r\n\r\n`));
+    socket.write(Buffer.from(`HTTP/1.1 200 OK\r\n\r\n`));
     socket.emit("close");
   });
 });
