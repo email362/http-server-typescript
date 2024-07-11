@@ -11,16 +11,23 @@ const server = net.createServer((socket) => {
   console.log("Client connected");
   socket.on("data", (data) => {
     const request = data.toString();
-    console.log(request.split("\r\n"));
-    const [method, path, version] = request.split("\r\n")[0].split(" ");
+    const [head, body] = request.split("\r\n\r\n");
+    const [status, ...headers] = head.split("\r\n");
+    const [method, path, version] = status.split(" ");
     if (path === "/") {
       socket.write(OK);
+    } else if (/\/echo\/?/.test(path)) {
+      const echoStr = path.split("/").pop() as string;
+      const response = Buffer.from(echoStr);
+      const headers = Buffer.from(
+        `Content-Type: text/plain\r\nContent-Length: ${response.length}\r\n`
+      );
+      socket.write(Buffer.concat([OK, headers, response]));
     } else {
       socket.write(NOT_FOUND);
     }
     socket.end();
   });
-  // socket.end();
 });
 
 server.listen(4221, "localhost");
