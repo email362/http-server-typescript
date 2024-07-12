@@ -1,5 +1,6 @@
 import * as net from "net";
-
+import fs from "node:fs";
+import { argv } from "process";
 // response status type
 type StatusString = "HTTP/1.1 200 OK\r\n" | "HTTP/1.1 404 Not Found\r\n";
 
@@ -28,14 +29,24 @@ type Response = {
 };
 
 enum Path {
-  ROOT = "/",
-  ECHO = "/echo",
-  USER_AGENT = "/user-agent",
+  ROOT = "",
+  ECHO = "echo",
+  USER_AGENT = "user-agent",
+  FILE = "file",
 }
 
 enum StatusLine {
   OK = "HTTP/1.1 200 OK\r\n",
   NOT_FOUND = "HTTP/1.1 404 Not Found\r\n",
+}
+
+function getFile(pathToFile: string) {
+  try {
+    const file = fs.readFileSync(pathToFile);
+    return file;
+  } catch (e) {
+    return new Error("File not found");
+  }
 }
 
 function parsedRequest(request: Buffer): Request {
@@ -70,6 +81,10 @@ function createResponse({ status, headers = {}, body = "" }: Response): Buffer {
   ]);
 }
 
+const filePathPrefix = argv.includes("--directory")
+  ? argv[argv.indexOf("--directory") + 1]
+  : "";
+
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
@@ -87,7 +102,7 @@ const server = net.createServer((socket) => {
       headers: {},
       body: "",
     });
-    switch (path) {
+    switch (basePath) {
       case Path.ROOT:
         response = createResponse({
           status: StatusLine.OK,
@@ -96,8 +111,8 @@ const server = net.createServer((socket) => {
         });
         socket.write(response);
         break;
-      case `${Path.ECHO}/${query}`:
-        const echoStr = path.split("/").pop() as string;
+      case Path.ECHO:
+        const echoStr = query;
         const resHeaders = {
           "Content-Type": "text/plain",
           "Content-Length": echoStr.length.toString(),
@@ -126,6 +141,31 @@ const server = net.createServer((socket) => {
         } else {
           socket.write(response);
         }
+        break;
+      case Path.FILE:
+        const filePath = `${filePathPrefix}/${query}`;
+        try {
+          const file = getFile(filePath);
+          if (file instanceof Error) {
+            throw new Error("File not found");
+          }
+          const resHeaders = {
+            "Content-Type": "application/octet-stream",
+            "Content-Length": file.length.toString(),
+          };
+          response = createResponse({
+            status: StatusLine.OK,
+            headers: resHeaders,
+            body: file.toString(),
+          });
+        } catch (e) {
+          response = createResponse({
+            status: StatusLine.NOT_FOUND,
+            headers: {},
+            body: "",
+          });
+        }
+        socket.write(response);
         break;
       default:
         socket.write(response);
