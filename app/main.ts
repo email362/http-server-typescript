@@ -32,7 +32,7 @@ enum Path {
   ROOT = "",
   ECHO = "echo",
   USER_AGENT = "user-agent",
-  FILE = "file",
+  FILE = "files",
 }
 
 enum StatusLine {
