@@ -2,7 +2,10 @@ import * as net from "net";
 import fs from "node:fs";
 import { argv } from "process";
 // response status type
-type StatusString = "HTTP/1.1 200 OK\r\n" | "HTTP/1.1 404 Not Found\r\n";
+type StatusString =
+  | "HTTP/1.1 200 OK\r\n"
+  | "HTTP/1.1 404 Not Found\r\n"
+  | "HTTP/1.1 201 Created\r\n";
 
 // response headers type
 type Headers = {
@@ -38,6 +41,7 @@ enum Path {
 enum StatusLine {
   OK = "HTTP/1.1 200 OK\r\n",
   NOT_FOUND = "HTTP/1.1 404 Not Found\r\n",
+  CREATED = "HTTP/1.1 201 Created\r\n",
 }
 
 function getFile(pathToFile: string) {
@@ -46,6 +50,15 @@ function getFile(pathToFile: string) {
     return file;
   } catch (e) {
     return new Error("File not found");
+  }
+}
+
+function createFile(fileName: string, content: string) {
+  try {
+    fs.writeFileSync(fileName, content);
+    return content;
+  } catch (e) {
+    return new Error("File not created");
   }
 }
 
@@ -95,7 +108,7 @@ const NOT_FOUND = Buffer.from(`HTTP/1.1 404 Not Found\r\n\r\n`);
 const server = net.createServer((socket) => {
   console.log("Client connected");
   socket.on("data", (data) => {
-    const { status, headers, body, path } = parsedRequest(data);
+    const { status, headers, body, path, method } = parsedRequest(data);
     const [, basePath, query] = path.split("/");
     let response = createResponse({
       status: StatusLine.NOT_FOUND,
@@ -145,7 +158,8 @@ const server = net.createServer((socket) => {
       case Path.FILE:
         const filePath = `${filePathPrefix}/${query}`;
         try {
-          const file = getFile(filePath);
+          const file =
+            method === "GET" ? getFile(filePath) : createFile(filePath, body);
           if (file instanceof Error) {
             throw new Error("File not found");
           }
@@ -154,7 +168,7 @@ const server = net.createServer((socket) => {
             "Content-Length": file.length.toString(),
           };
           response = createResponse({
-            status: StatusLine.OK,
+            status: method === "GET" ? StatusLine.OK : StatusLine.CREATED,
             headers: resHeaders,
             body: file.toString(),
           });
