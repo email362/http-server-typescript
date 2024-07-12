@@ -1,5 +1,75 @@
 import * as net from "net";
 
+// response status type
+type StatusString = "HTTP/1.1 200 OK\r\n" | "HTTP/1.1 404 Not Found\r\n";
+
+// response headers type
+type Headers = {
+  "Content-Type"?: string;
+  "Content-Length"?: string;
+  "User-Agent"?: string;
+};
+
+// request type
+type Request = {
+  status: string;
+  headers: Headers;
+  body: string;
+  method: string;
+  path: string;
+  version: string;
+};
+
+// response type
+type Response = {
+  status: StatusString;
+  headers: Headers;
+  body: string;
+};
+
+enum Path {
+  ROOT = "/",
+  ECHO = "/echo",
+  USER_AGENT = "/user-agent",
+}
+
+enum StatusLine {
+  OK = "HTTP/1.1 200 OK\r\n",
+  NOT_FOUND = "HTTP/1.1 404 Not Found\r\n",
+}
+
+function parsedRequest(request: Buffer): Request {
+  const data = request.toString();
+  const [head, body] = data.split("\r\n\r\n");
+  const [status, ...headers] = head.split("\r\n");
+  const headersMap = headers.reduce((acc, header) => {
+    const [key, value] = header.split(": ");
+    return { ...acc, [key]: value };
+  }, {});
+  const [method, path, version] = status.split(" ");
+  return {
+    status,
+    headers: headersMap,
+    body,
+    method,
+    path,
+    version,
+  };
+}
+
+function createResponse({ status, headers = {}, body = "" }: Response): Buffer {
+  return Buffer.concat([
+    Buffer.from(status),
+    Buffer.from(
+      Object.entries(headers)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join("\r\n")
+    ),
+    Buffer.from("\r\n\r\n"),
+    Buffer.from(body),
+  ]);
+}
+
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
@@ -10,22 +80,64 @@ const NOT_FOUND = Buffer.from(`HTTP/1.1 404 Not Found\r\n\r\n`);
 const server = net.createServer((socket) => {
   console.log("Client connected");
   socket.on("data", (data) => {
-    const request = data.toString();
-    const [head, body] = request.split("\r\n\r\n");
-    const [status, ...headers] = head.split("\r\n");
-    const [method, path, version] = status.split(" ");
-    if (path === "/") {
-      socket.write(OK);
-    } else if (/\/echo\/?/.test(path)) {
-      const echoStr = path.split("/").pop() as string;
-      const status = Buffer.from(`HTTP/1.1 200 OK\r\n`);
-      const response = Buffer.from(echoStr);
-      const headers = Buffer.from(
-        `Content-Type: text/plain\r\nContent-Length: ${response.length}\r\n\r\n`
-      );
-      socket.write(Buffer.concat([status, headers, response]));
-    } else {
-      socket.write(NOT_FOUND);
+    const { status, headers, body, path } = parsedRequest(data);
+    const [, basePath, query] = path.split("/");
+    let response = createResponse({
+      status: StatusLine.NOT_FOUND,
+      headers: {},
+      body: "",
+    });
+    switch (path) {
+      case Path.ROOT:
+        response = createResponse({
+          status: StatusLine.OK,
+          headers: {},
+          body: "",
+        });
+        socket.write(response);
+        break;
+      case `${Path.ECHO}/${query}`:
+        if (/\/echo\/?/.test(path)) {
+          const echoStr = path.split("/").pop() as string;
+          const headers = {
+            "Content-Type": "text/plain",
+            "Content-Length": response.length.toString(),
+          };
+          response = createResponse({
+            status: StatusLine.OK,
+            headers,
+            body: echoStr,
+          });
+          socket.write(response);
+        } else {
+          response = createResponse({
+            status: StatusLine.NOT_FOUND,
+            headers: {},
+            body: "",
+          });
+          socket.write(response);
+        }
+        break;
+      case Path.USER_AGENT:
+        const hasUserAgent = "User-Agent" in headers;
+        if (hasUserAgent) {
+          const userAgent = headers["User-Agent"] ? headers["User-Agent"] : "";
+          const resHeaders = {
+            "Content-Type": "text/plain",
+            "Content-Length": userAgent.length.toString(),
+          };
+          response = createResponse({
+            status: StatusLine.OK,
+            headers: resHeaders,
+            body: userAgent,
+          });
+          socket.write(response);
+        } else {
+          socket.write(response);
+        }
+        break;
+      default:
+        socket.write(response);
     }
     socket.end();
   });
