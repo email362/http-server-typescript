@@ -97,26 +97,17 @@ const server = net.createServer((socket) => {
         socket.write(response);
         break;
       case `${Path.ECHO}/${query}`:
-        if (/\/echo\/?/.test(path)) {
-          const echoStr = path.split("/").pop() as string;
-          const headers = {
-            "Content-Type": "text/plain",
-            "Content-Length": response.length.toString(),
-          };
-          response = createResponse({
-            status: StatusLine.OK,
-            headers,
-            body: echoStr,
-          });
-          socket.write(response);
-        } else {
-          response = createResponse({
-            status: StatusLine.NOT_FOUND,
-            headers: {},
-            body: "",
-          });
-          socket.write(response);
-        }
+        const echoStr = path.split("/").pop() as string;
+        const resHeaders = {
+          "Content-Type": "text/plain",
+          "Content-Length": echoStr.length.toString(),
+        };
+        response = createResponse({
+          status: StatusLine.OK,
+          headers: resHeaders,
+          body: echoStr,
+        });
+        socket.write(response);
         break;
       case Path.USER_AGENT:
         const hasUserAgent = "User-Agent" in headers;
@@ -124,7 +115,7 @@ const server = net.createServer((socket) => {
           const userAgent = headers["User-Agent"] ? headers["User-Agent"] : "";
           const resHeaders = {
             "Content-Type": "text/plain",
-            "Content-Length": userAgent.length.toString(),
+            "Content-Length": userAgent?.length.toString(),
           };
           response = createResponse({
             status: StatusLine.OK,
