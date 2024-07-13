@@ -1,6 +1,7 @@
 import * as net from "net";
 import fs from "node:fs";
 import { argv } from "process";
+
 // response status type
 type StatusString =
   | "HTTP/1.1 200 OK\r\n"
