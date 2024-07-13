@@ -13,6 +13,8 @@ type Headers = {
   "Content-Type"?: string;
   "Content-Length"?: string;
   "User-Agent"?: string;
+  "Accept-Encoding"?: string;
+  "Content-Encoding"?: string;
 };
 
 // request type
@@ -102,9 +104,6 @@ const filePathPrefix = argv.includes("--directory")
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
-const OK = Buffer.from(`HTTP/1.1 200 OK\r\n\r\n`);
-const NOT_FOUND = Buffer.from(`HTTP/1.1 404 Not Found\r\n\r\n`);
-
 // Uncomment this to pass the first stage
 const server = net.createServer((socket) => {
   console.log("Client connected");
@@ -127,10 +126,14 @@ const server = net.createServer((socket) => {
         break;
       case Path.ECHO:
         const echoStr = query;
-        const resHeaders = {
+        const resHeaders: Headers = {
           "Content-Type": "text/plain",
           "Content-Length": echoStr.length.toString(),
         };
+        headers["Accept-Encoding"] === "gzip"
+          ? (resHeaders["Content-Encoding"] = "gzip")
+          : null;
+
         response = createResponse({
           status: StatusLine.OK,
           headers: resHeaders,
